@@ -2,6 +2,8 @@ from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
 from src.api import auth
 from enum import Enum
+import sqlalchemy
+from src import database as db
 
 router = APIRouter(
     prefix="/carts",
@@ -18,6 +20,9 @@ class search_sort_options(str, Enum):
 class search_sort_order(str, Enum):
     asc = "asc"
     desc = "desc"   
+
+with db.engine.begin() as connection:
+    result = connection.execute(sqlalchemy.text(sql_to_execute))
 
 @router.get("/search/", tags=["search"])
 def search_orders(
