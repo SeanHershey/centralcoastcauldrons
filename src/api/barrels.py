@@ -19,9 +19,6 @@ class Barrel(BaseModel):
 
     quantity: int
 
-with db.engine.begin() as connection:
-    result = connection.execute(sqlalchemy.text(sql_to_execute))
-
 @router.post("/deliver/{order_id}")
 def post_deliver_barrels(barrels_delivered: list[Barrel], order_id: int):
     """ """

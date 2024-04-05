@@ -15,9 +15,6 @@ class PotionInventory(BaseModel):
     potion_type: list[int]
     quantity: int
 
-with db.engine.begin() as connection:
-    result = connection.execute(sqlalchemy.text(sql_to_execute))
-
 @router.post("/deliver/{order_id}")
 def post_deliver_bottles(potions_delivered: list[PotionInventory], order_id: int):
     """ """
