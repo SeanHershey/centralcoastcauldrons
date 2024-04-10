@@ -19,11 +19,11 @@ def get_catalog():
             {
                 "sku": "GREEN_POTION_0",
                 "name": "green potion",
-                "quantity": num_green_potions,
-                "price": 50,
+                "quantity": 1,
+                "price": 1, # should be 50
                 "potion_type": [100, 0, 0, 0],
             }
         ] 
     else:
-        return [] 
+        return []
     

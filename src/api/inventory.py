@@ -14,8 +14,13 @@ router = APIRouter(
 @router.get("/audit")
 def get_inventory():
     """ """
+
+    with db.engine.begin() as connection:
+        num_green_potions = connection.execute(sqlalchemy.text("SELECT num_green_potions FROM global_inventory")).scalar_one()
+        num_green_ml = connection.execute(sqlalchemy.text("SELECT num_green_ml FROM global_inventory")).scalar_one()
+        gold = connection.execute(sqlalchemy.text("SELECT gold FROM global_inventory")).scalar_one()
     
-    return {"number_of_potions": 0, "ml_in_barrels": 0, "gold": 0}
+    return {"number_of_potions": num_green_potions, "ml_in_barrels": num_green_ml, "gold": gold}
 
 # Gets called once a day
 @router.post("/plan")
@@ -25,10 +30,14 @@ def get_capacity_plan():
     capacity unit costs 1000 gold.
     """
 
+    with db.engine.begin() as connection:
+        num_green_potions = connection.execute(sqlalchemy.text("SELECT num_green_potions FROM global_inventory")).scalar_one()
+        num_green_ml = connection.execute(sqlalchemy.text("SELECT num_green_ml FROM global_inventory")).scalar_one()
+
     return {
-        "potion_capacity": 0,
-        "ml_capacity": 0
-        }
+        "potion_capacity": 50 - num_green_potions,
+        "ml_capacity": 10000 - num_green_ml
+    }
 
 class CapacityPurchase(BaseModel):
     potion_capacity: int
