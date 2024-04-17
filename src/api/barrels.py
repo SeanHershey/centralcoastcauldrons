@@ -102,7 +102,6 @@ def get_wholesale_purchase_plan(wholesale_catalog: list[Barrel]):
         if barrel_purchase is not None:
             barrel_purchases.append(barrel_purchase)
             gold -= price
-            print(f"gold: {gold}")
             current_ml += ml
 
     print(f"barrel_purchases: {barrel_purchases}")
