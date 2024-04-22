@@ -21,22 +21,13 @@ def post_deliver_bottles(potions_delivered: list[PotionInventory], order_id: int
     print(f"potions delivered: {potions_delivered} order_id: {order_id}")
 
     with db.engine.begin() as connection:
-        red_potions = connection.execute(sqlalchemy.text("SELECT red_potions FROM global_inventory")).scalar_one()
-        green_potions = connection.execute(sqlalchemy.text("SELECT green_potions FROM global_inventory")).scalar_one()
-        blue_potions = connection.execute(sqlalchemy.text("SELECT blue_potions FROM global_inventory")).scalar_one()
+        catalog = connection.execute(sqlalchemy.text("SELECT quantity, sku, type FROM catalog"))
 
-    for potion in potions_delivered:
-        if potion.potion_type[0] > 0:
-            red_potions += potion.quantity
-        elif potion.potion_type[1] > 0:
-            green_potions += potion.quantity
-        elif potion.potion_type[2] > 0:
-            blue_potions += potion.quantity
-
-    with db.engine.begin() as connection:
-        connection.execute(sqlalchemy.text("UPDATE global_inventory SET red_potions = " + str(red_potions)))
-        connection.execute(sqlalchemy.text("UPDATE global_inventory SET green_potions = " + str(green_potions)))
-        connection.execute(sqlalchemy.text("UPDATE global_inventory SET blue_potions = " + str(blue_potions)))
+        for potion in catalog:
+            for delivery in potions_delivered:
+                if delivery.potion_type == potion.type:
+                    connection.execute(sqlalchemy.text("UPDATE catalog SET quantity = " + str(potion.quantity + delivery.quantity) +
+                                                        " WHERE sku = '" + str(potion.sku) + "'"))
 
     return "OK"
 
@@ -46,58 +37,53 @@ def get_bottle_plan():
     Go from barrel to bottle.
     """
 
-    # Each bottle has a quantity of what proportion of red, blue, and
-    # green potion to add.
-    # Expressed in integers from 1 to 100 that must sum up to 100.
-
-    # Initial logic: bottle all barrels into red potions.
-
     with db.engine.begin() as connection:
         red_ml = connection.execute(sqlalchemy.text("SELECT red_ml FROM global_inventory")).scalar_one()
         green_ml = connection.execute(sqlalchemy.text("SELECT green_ml FROM global_inventory")).scalar_one()
         blue_ml = connection.execute(sqlalchemy.text("SELECT blue_ml FROM global_inventory")).scalar_one()
 
-    order = []
+        order = []
 
-    quantity = red_ml // 100
-    red_ml -= quantity * 100
-    print(quantity)
-    if quantity > 0:
-        order.append(
-            {
-                "potion_type": [100, 0, 0, 0],
-                "quantity": quantity,
-            }
-        )
+        # MAGIC BOTTLES
+        quantity = min([(red_ml // 30), (green_ml // 30), (blue_ml // 30)])
+        red_ml -= quantity * 30
+        green_ml -= quantity * 30
+        blue_ml -= quantity * 30
+        if quantity > 0:
+            order.append(
+                {
+                    "potion_type": [30, 30, 30, 0],
+                    "quantity": quantity,
+                }
+            )
+        
+        # HEALTH BOTTLES
+        quantity = red_ml // 100
+        red_ml -= quantity * 100
+        if quantity > 0:
+            order.append(
+                {
+                    "potion_type": [100, 0, 0, 0],
+                    "quantity": quantity,
+                }
+            )
 
-    quantity = green_ml // 100
-    green_ml -= quantity * 100
-    print(quantity)
-    if quantity > 0:
-        order.append(
-            {
-                "potion_type": [0, 100, 0, 0],
-                "quantity": quantity,
-            }
-        )
-    
-    quantity = blue_ml // 100
-    blue_ml -= quantity * 100
-    print(quantity)
-    if quantity > 0:
-        order.append(
-            {
-                "potion_type": [0, 0, 100, 0],
-                "quantity": quantity,
-            }
-        )
-
-    with db.engine.begin() as connection:
+        # STAMINA BOTTLES
+        quantity = green_ml // 100
+        green_ml -= quantity * 100
+        if quantity > 0:
+            order.append(
+                {
+                    "potion_type": [0, 100, 0, 0],
+                    "quantity": quantity,
+                }
+            )
+        
         connection.execute(sqlalchemy.text("UPDATE global_inventory SET red_ml = " + str(red_ml) + 
                                            ", green_ml = " + str(green_ml) + 
                                            ", blue_ml = " + str(blue_ml)))
 
-    print(order)
+    print("get_bottle_plan:", order)
 
     return order
 

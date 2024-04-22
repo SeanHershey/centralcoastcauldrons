@@ -79,33 +79,33 @@ def get_wholesale_purchase_plan(wholesale_catalog: list[Barrel]):
     with db.engine.begin() as connection:
         results = connection.execute(sqlalchemy.text("SELECT gold, red_ml, green_ml, blue_ml FROM global_inventory")).one()
         
-    gold = results.gold
-    ml_inventory = [results.red_ml, results.green_ml, results.blue_ml]
-    current_ml = sum(ml_inventory)
+        gold = results.gold
+        ml_inventory = [results.red_ml, results.green_ml, results.blue_ml]
+        current_ml = sum(ml_inventory)
 
-    # STRATEGY - for each potion type buy affordable barrels that bring the ml closest to the target ml
-    TARGET_ML = 800
+        # STRATEGY - for each potion type buy ONE of each type of affordable barrel that brings the ml closest to the target ml
+        TARGET_ML = 1000
 
-    barrel_purchases = []
-    print(ml_inventory)
-    for i, ml_inv in enumerate(ml_inventory):
-        barrel_purchase = None
-        price = None
-        ml = 0
+        barrel_purchases = []
 
-        for barrel in wholesale_catalog:
-            if len(barrel.potion_type) < 3:
-                break
+        for i, ml in enumerate(ml_inventory):
+            barrel_purchase = None
+            price = None
+            ml_add = 0
 
-            if (barrel.potion_type[i] > 0) & (barrel.price <= gold) & (barrel.ml_per_barrel > ml) & (ml_inv + barrel.ml_per_barrel <= TARGET_ML):
-                barrel_purchase = {"sku": barrel.sku, "quantity": 1}
-                price = barrel.price
-                ml = barrel.ml_per_barrel
+            for barrel in wholesale_catalog:
+                if len(barrel.potion_type) < 3:
+                    break
 
-        if barrel_purchase is not None:
-            barrel_purchases.append(barrel_purchase)
-            gold -= price
-            current_ml += ml
+                if (barrel.potion_type[i] > 0) & (barrel.price <= gold) & (barrel.ml_per_barrel > ml_add) & (ml + barrel.ml_per_barrel <= TARGET_ML):
+                    barrel_purchase = {"sku": barrel.sku, "quantity": 1}
+                    price = barrel.price
+                    ml_add = barrel.ml_per_barrel
+
+            if barrel_purchase is not None:
+                barrel_purchases.append(barrel_purchase)
+                gold -= price
+                current_ml += ml_add
 
     print(f"barrel_purchases: {barrel_purchases}")
 
