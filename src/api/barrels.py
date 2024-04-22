@@ -87,13 +87,16 @@ def get_wholesale_purchase_plan(wholesale_catalog: list[Barrel]):
     TARGET_ML = 800
 
     barrel_purchases = []
-
+    print(ml_inventory)
     for i, ml_inv in enumerate(ml_inventory):
         barrel_purchase = None
         price = None
         ml = 0
 
         for barrel in wholesale_catalog:
+            if len(barrel.potion_type) < 3:
+                break
+
             if (barrel.potion_type[i] > 0) & (barrel.price <= gold) & (barrel.ml_per_barrel > ml) & (ml_inv + barrel.ml_per_barrel <= TARGET_ML):
                 barrel_purchase = {"sku": barrel.sku, "quantity": 1}
                 price = barrel.price

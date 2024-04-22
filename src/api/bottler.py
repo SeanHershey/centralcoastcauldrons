@@ -21,22 +21,22 @@ def post_deliver_bottles(potions_delivered: list[PotionInventory], order_id: int
     print(f"potions delivered: {potions_delivered} order_id: {order_id}")
 
     with db.engine.begin() as connection:
-        num_red_potions = connection.execute(sqlalchemy.text("SELECT num_red_potions FROM global_inventory")).scalar_one()
-        num_green_potions = connection.execute(sqlalchemy.text("SELECT num_green_potions FROM global_inventory")).scalar_one()
-        num_blue_potions = connection.execute(sqlalchemy.text("SELECT num_blue_potions FROM global_inventory")).scalar_one()
+        red_potions = connection.execute(sqlalchemy.text("SELECT red_potions FROM global_inventory")).scalar_one()
+        green_potions = connection.execute(sqlalchemy.text("SELECT green_potions FROM global_inventory")).scalar_one()
+        blue_potions = connection.execute(sqlalchemy.text("SELECT blue_potions FROM global_inventory")).scalar_one()
 
     for potion in potions_delivered:
         if potion.potion_type[0] > 0:
-            num_red_potions += potion.quantity
+            red_potions += potion.quantity
         elif potion.potion_type[1] > 0:
-            num_green_potions += potion.quantity
+            green_potions += potion.quantity
         elif potion.potion_type[2] > 0:
-            num_blue_potions += potion.quantity
+            blue_potions += potion.quantity
 
     with db.engine.begin() as connection:
-        connection.execute(sqlalchemy.text("UPDATE global_inventory SET num_red_potions = " + str(num_red_potions)))
-        connection.execute(sqlalchemy.text("UPDATE global_inventory SET num_green_potions = " + str(num_green_potions)))
-        connection.execute(sqlalchemy.text("UPDATE global_inventory SET num_blue_potions = " + str(num_blue_potions)))
+        connection.execute(sqlalchemy.text("UPDATE global_inventory SET red_potions = " + str(red_potions)))
+        connection.execute(sqlalchemy.text("UPDATE global_inventory SET green_potions = " + str(green_potions)))
+        connection.execute(sqlalchemy.text("UPDATE global_inventory SET blue_potions = " + str(blue_potions)))
 
     return "OK"
 
@@ -53,14 +53,14 @@ def get_bottle_plan():
     # Initial logic: bottle all barrels into red potions.
 
     with db.engine.begin() as connection:
-        num_red_ml = connection.execute(sqlalchemy.text("SELECT num_red_ml FROM global_inventory")).scalar_one()
-        num_green_ml = connection.execute(sqlalchemy.text("SELECT num_green_ml FROM global_inventory")).scalar_one()
-        num_blue_ml = connection.execute(sqlalchemy.text("SELECT num_blue_ml FROM global_inventory")).scalar_one()
+        red_ml = connection.execute(sqlalchemy.text("SELECT red_ml FROM global_inventory")).scalar_one()
+        green_ml = connection.execute(sqlalchemy.text("SELECT green_ml FROM global_inventory")).scalar_one()
+        blue_ml = connection.execute(sqlalchemy.text("SELECT blue_ml FROM global_inventory")).scalar_one()
 
     order = []
 
-    quantity = num_red_ml // 100
-    num_red_ml -= quantity * 100
+    quantity = red_ml // 100
+    red_ml -= quantity * 100
     print(quantity)
     if quantity > 0:
         order.append(
@@ -70,8 +70,8 @@ def get_bottle_plan():
             }
         )
 
-    quantity = num_green_ml // 100
-    num_green_ml -= quantity * 100
+    quantity = green_ml // 100
+    green_ml -= quantity * 100
     print(quantity)
     if quantity > 0:
         order.append(
@@ -81,8 +81,8 @@ def get_bottle_plan():
             }
         )
     
-    quantity = num_blue_ml // 100
-    num_blue_ml -= quantity * 100
+    quantity = blue_ml // 100
+    blue_ml -= quantity * 100
     print(quantity)
     if quantity > 0:
         order.append(
@@ -93,9 +93,9 @@ def get_bottle_plan():
         )
 
     with db.engine.begin() as connection:
-        connection.execute(sqlalchemy.text("UPDATE global_inventory SET num_red_ml = " + str(num_red_ml) + 
-                                           ", num_green_ml = " + str(num_green_ml) + 
-                                           ", num_blue_ml = " + str(num_blue_ml)))
+        connection.execute(sqlalchemy.text("UPDATE global_inventory SET red_ml = " + str(red_ml) + 
+                                           ", green_ml = " + str(green_ml) + 
+                                           ", blue_ml = " + str(blue_ml)))
 
     print(order)
 

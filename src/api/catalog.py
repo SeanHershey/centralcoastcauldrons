@@ -12,35 +12,35 @@ def get_catalog():
     """
 
     with db.engine.begin() as connection:
-        num_red_potions = connection.execute(sqlalchemy.text("SELECT num_red_potions FROM global_inventory")).scalar_one()
-        num_green_potions = connection.execute(sqlalchemy.text("SELECT num_green_potions FROM global_inventory")).scalar_one()
-        num_blue_potions = connection.execute(sqlalchemy.text("SELECT num_blue_potions FROM global_inventory")).scalar_one()
+        red_potions = connection.execute(sqlalchemy.text("SELECT red_potions FROM global_inventory")).scalar_one()
+        green_potions = connection.execute(sqlalchemy.text("SELECT green_potions FROM global_inventory")).scalar_one()
+        blue_potions = connection.execute(sqlalchemy.text("SELECT blue_potions FROM global_inventory")).scalar_one()
 
     catalog = []
 
-    if num_red_potions > 0:
+    if red_potions > 0:
         catalog.append({
             "sku": "RED_POTION_0",
             "name": "red potion",
-            "quantity": num_red_potions,
+            "quantity": red_potions,
             "price": 50,
             "potion_type": [100, 0, 0, 0],
         })
     
-    if num_green_potions > 0:
+    if green_potions > 0:
         catalog.append({
             "sku": "GREEN_POTION_0",
             "name": "green potion",
-            "quantity": num_green_potions,
+            "quantity": green_potions,
             "price": 50,
             "potion_type": [0, 100, 0, 0],
         })
     
-    if num_blue_potions > 0:
+    if blue_potions > 0:
         catalog.append({
             "sku": "BLUE_POTION_0",
             "name": "blue potion",
-            "quantity": num_blue_potions,
+            "quantity": blue_potions,
             "price": 50,
             "potion_type": [0, 0, 100, 0],
         })
