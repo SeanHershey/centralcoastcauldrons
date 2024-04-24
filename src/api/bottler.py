@@ -21,14 +21,27 @@ def post_deliver_bottles(potions_delivered: list[PotionInventory], order_id: int
     print(f"potions delivered: {potions_delivered} order_id: {order_id}")
 
     with db.engine.begin() as connection:
-        catalog = connection.execute(sqlalchemy.text("SELECT quantity, sku, type FROM catalog"))
+        catalog = connection.execute(sqlalchemy.text(
+            "SELECT quantity, sku, type FROM catalog"))
+
+        red_ml, green_ml, blue_ml = connection.execute(sqlalchemy.text(
+            "SELECT red_ml, green_ml, blue_ml FROM global_inventory")).one()
 
         for potion in catalog:
             for delivery in potions_delivered:
                 if delivery.potion_type == potion.type:
-                    connection.execute(sqlalchemy.text("UPDATE catalog SET quantity = " + str(potion.quantity + delivery.quantity) +
-                                                        " WHERE sku = '" + str(potion.sku) + "'"))
+                    red_ml -= potion.type[0] * delivery.quantity
+                    green_ml -= potion.type[1] * delivery.quantity
+                    blue_ml -= potion.type[2] * delivery.quantity
 
+                    connection.execute(sqlalchemy.text(
+                        "UPDATE global_inventory SET red_ml = :red_ml, green_ml = :green_ml, blue_ml = :blue_ml"),
+                        [{"red_ml":red_ml, "green_ml":green_ml, "blue_ml":blue_ml}])
+
+                    connection.execute(sqlalchemy.text(
+                        "UPDATE catalog SET quantity = :quantity WHERE sku = :sku"),
+                        [{"quantity":str(potion.quantity + delivery.quantity), "sku":potion.sku}])
+    
     return "OK"
 
 @router.post("/plan")
@@ -38,9 +51,8 @@ def get_bottle_plan():
     """
 
     with db.engine.begin() as connection:
-        red_ml = connection.execute(sqlalchemy.text("SELECT red_ml FROM global_inventory")).scalar_one()
-        green_ml = connection.execute(sqlalchemy.text("SELECT green_ml FROM global_inventory")).scalar_one()
-        blue_ml = connection.execute(sqlalchemy.text("SELECT blue_ml FROM global_inventory")).scalar_one()
+        red_ml, green_ml, blue_ml = connection.execute(sqlalchemy.text(
+            "SELECT red_ml, green_ml, blue_ml FROM global_inventory")).one()
 
         order = []
 
@@ -79,10 +91,7 @@ def get_bottle_plan():
                 }
             )
         
-        connection.execute(sqlalchemy.text("UPDATE global_inventory SET red_ml = " + str(red_ml) + 
-                                           ", green_ml = " + str(green_ml) + 
-                                           ", blue_ml = " + str(blue_ml)))
-
+        
     print("get_bottle_plan:", order)
 
     return order

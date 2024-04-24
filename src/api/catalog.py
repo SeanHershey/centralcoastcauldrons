@@ -12,18 +12,19 @@ def get_catalog():
     """
         
     with db.engine.begin() as connection:
-            results = connection.execute(sqlalchemy.text("SELECT sku, name, type, quantity, price FROM catalog"))
+        results = connection.execute(sqlalchemy.text(
+            "SELECT sku, name, quantity, price, type FROM catalog"))
 
     catalog = []
 
-    for item in results:
-        if item.quantity > 0:
+    for potion in results:
+        if potion.quantity > 0:
             catalog.append({
-                "sku": item.sku,
-                "name": item.name,
-                "quantity": item.quantity,
-                "price": item.price,
-                "potion_type": item.type
+                "sku": potion.sku,
+                "name": potion.name,
+                "quantity": potion.quantity,
+                "price": potion.price,
+                "potion_type": potion.type
             })
     
     return catalog

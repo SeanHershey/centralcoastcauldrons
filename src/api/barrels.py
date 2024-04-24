@@ -27,10 +27,9 @@ def post_deliver_barrels(barrels_delivered: list[Barrel], order_id: int):
 
     with db.engine.begin() as connection:
         try:
-            connection.execute(
-                sqlalchemy.text(
-                    "INSERT INTO processed (job_id, type) VALUES (:order_id, 'barrels')"), 
-                [{"order_id": order_id}])
+            connection.execute(sqlalchemy.text(
+                "INSERT INTO processed (job_id, type) VALUES (:order_id, 'barrels')"), 
+                [{"order_id":order_id}])
         except IntegrityError as e:
             return "OK"
         
@@ -54,17 +53,15 @@ def post_deliver_barrels(barrels_delivered: list[Barrel], order_id: int):
             else:
                 raise Exception("Invalid potion type")
 
-        connection.execute(
-            sqlalchemy.text(
-                """
-                UPDATE global_inventory SET
-                gold = gold - :gold_paid,
-                red_ml = red_ml + :red_ml,
-                green_ml = green_ml + :green_ml,
-                blue_ml = blue_ml + :blue_ml,
-                dark_ml = dark_ml + :dark_ml
-                """),
-                [{"gold_paid":gold_paid, "red_ml":red_ml, "green_ml":green_ml, "blue_ml":blue_ml, "dark_ml":dark_ml}])
+        connection.execute(sqlalchemy.text(
+            """
+            UPDATE global_inventory SET
+            gold = gold - :gold_paid,
+            red_ml = red_ml + :red_ml,
+            green_ml = green_ml + :green_ml,
+            blue_ml = blue_ml + :blue_ml,
+            dark_ml = dark_ml + :dark_ml"""),
+            [{"gold_paid":gold_paid, "red_ml":red_ml, "green_ml":green_ml, "blue_ml":blue_ml, "dark_ml":dark_ml}])
 
     print(f"gold_paid: {gold_paid} red_ml: {red_ml} green_ml: {green_ml} blue_ml: {blue_ml} dark_ml: {dark_ml}")
 
@@ -77,13 +74,14 @@ def get_wholesale_purchase_plan(wholesale_catalog: list[Barrel]):
     print(f"barrel_catalog {wholesale_catalog}")
 
     with db.engine.begin() as connection:
-        results = connection.execute(sqlalchemy.text("SELECT gold, red_ml, green_ml, blue_ml FROM global_inventory")).one()
+        results = connection.execute(sqlalchemy.text(
+            "SELECT gold, red_ml, green_ml, blue_ml FROM global_inventory")).one()
         
         gold = results.gold
         ml_inventory = [results.red_ml, results.green_ml, results.blue_ml]
         current_ml = sum(ml_inventory)
 
-        # STRATEGY - for each potion type buy ONE of each type of affordable barrel that brings the ml closest to the target ml
+        # STRATEGY - for each ml buy barrels that brings ml closest to the target ml
         TARGET_ML = 1000
 
         barrel_purchases = []
@@ -98,7 +96,7 @@ def get_wholesale_purchase_plan(wholesale_catalog: list[Barrel]):
                     break
 
                 if (barrel.potion_type[i] > 0) & (barrel.price <= gold) & (barrel.ml_per_barrel > ml_add) & (ml + barrel.ml_per_barrel <= TARGET_ML):
-                    barrel_purchase = {"sku": barrel.sku, "quantity": 1}
+                    barrel_purchase = {"sku":barrel.sku, "quantity":1}
                     price = barrel.price
                     ml_add = barrel.ml_per_barrel
 
