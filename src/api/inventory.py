@@ -13,20 +13,22 @@ router = APIRouter(
 
 @router.get("/audit")
 def get_inventory():
-    """ """
+    """
+    Get inventory returns the total number of potions, ml, and gold.
+    """
 
     with db.engine.begin() as connection:
-        results = connection.execute(sqlalchemy.text(
-            "SELECT quantity FROM catalog"))
+        total_potions = connection.execute(sqlalchemy.text(
+            "SELECT SUM(quantity) FROM potion_ledger")).scalar_one()
         
-        gold, red_ml, green_ml, blue_ml = connection.execute(sqlalchemy.text(
-            "SELECT gold, red_ml, green_ml, blue_ml FROM global_inventory")).one()
-
-        total_potions = 0
-        for item in results:
-            total_potions += item.quantity
+        total_ml = connection.execute(sqlalchemy.text(
+            "SELECT SUM(red + green + blue + dark) FROM ml_ledger")).scalar_one()
+        
+        gold = connection.execute(sqlalchemy.text(
+            "SELECT SUM(gold) FROM gold_ledger")).scalar_one()
     
-    return {"number_of_potions": total_potions, "ml_in_barrels": red_ml + green_ml + blue_ml, "gold": gold}
+    print(f"potions: {total_potions}, ml: {total_ml}, gold: {gold}")
+    return {"number_of_potions": total_potions, "ml_in_barrels": total_ml, "gold": gold}
 
 
 # Gets called once a day
@@ -36,21 +38,16 @@ def get_capacity_plan():
     Start with 1 capacity for 50 potions and 1 capacity for 10000 ml of potion. Each additional 
     capacity unit costs 1000 gold.
     """
-
     with db.engine.begin() as connection:
-        results = connection.execute(sqlalchemy.text(
-            "SELECT quantity FROM catalog"))
+        gold = connection.execute(sqlalchemy.text(
+            "SELECT SUM(gold) FROM gold_ledger")).scalar_one()
         
-        red_ml, green_ml, blue_ml = connection.execute(sqlalchemy.text(
-            "SELECT red_ml, green_ml, blue_ml FROM global_inventory")).one()
+        units = gold // 3000
 
-        total_potions = 0
-        for item in results:
-            total_potions += item.quantity
-        
+    print(f"capacity plan potion units: {units}, ml units: {units}")
     return {
-        "potion_capacity": 50 - total_potions,
-        "ml_capacity": 10000 - (red_ml + green_ml + blue_ml)
+        "potion_capacity": units,
+        "ml_capacity": units
     }
 
 class CapacityPurchase(BaseModel):
@@ -64,5 +61,16 @@ def deliver_capacity_plan(capacity_purchase : CapacityPurchase, order_id: int):
     Start with 1 capacity for 50 potions and 1 capacity for 10000 ml of potion. Each additional 
     capacity unit costs 1000 gold.
     """
+    with db.engine.begin() as connection:
+        connection.execute(sqlalchemy.text(
+                "INSERT INTO capacity_ledger (potions, ml) VALUES (:potions, :ml)"),
+                [{"potions":capacity_purchase.potion_capacity * 50, "ml":capacity_purchase.ml_capacity * 10000}])
+        
+        gold_paid = (capacity_purchase.potion_capacity + capacity_purchase.ml_capacity) * 1000
 
+        connection.execute(sqlalchemy.text(
+                "INSERT INTO gold_ledger (gold) VALUES (-:gold)"),
+                [{"gold":gold_paid}])
+    
+    print(f"capacity deliver gold paid: {gold_paid}")
     return "OK"

@@ -22,8 +22,11 @@ class Barrel(BaseModel):
 
 @router.post("/deliver/{order_id}")
 def post_deliver_barrels(barrels_delivered: list[Barrel], order_id: int):
-    """ """
-    print(f"barrels delivered: {barrels_delivered} order_id: {order_id}")
+    """ 
+    Deliver barrels takes a list of barrels iterates over them adding to 
+    ml and subtracting gold as appropriate.
+    """
+    print(f"barrels delivered: {barrels_delivered} order id: {order_id}")
 
     with db.engine.begin() as connection:
         try:
@@ -34,55 +37,55 @@ def post_deliver_barrels(barrels_delivered: list[Barrel], order_id: int):
             return "OK"
         
         gold_paid = 0
-        red_ml = 0
-        green_ml = 0
-        blue_ml = 0
-        dark_ml = 0
-
+        ml = [0,0,0,0]
+        
         for barrel in barrels_delivered:
             gold_paid += barrel.price * barrel.quantity
 
-            if (barrel.potion_type[0] > 0):
-                red_ml += barrel.ml_per_barrel * barrel.quantity
-            elif (barrel.potion_type[1] > 0):
-                green_ml += barrel.ml_per_barrel * barrel.quantity
-            elif (barrel.potion_type[2] > 0):
-                blue_ml += barrel.ml_per_barrel * barrel.quantity
-            elif (barrel.potion_type[3] > 0):
-                dark_ml += barrel.ml_per_barrel * barrel.quantity
-            else:
-                raise Exception("Invalid potion type")
+            for i in range(4):
+                if (barrel.potion_type[i] > 0):
+                    ml[i] += barrel.ml_per_barrel * barrel.quantity
 
         connection.execute(sqlalchemy.text(
-            """
-            UPDATE global_inventory SET
-            gold = gold - :gold_paid,
-            red_ml = red_ml + :red_ml,
-            green_ml = green_ml + :green_ml,
-            blue_ml = blue_ml + :blue_ml,
-            dark_ml = dark_ml + :dark_ml"""),
-            [{"gold_paid":gold_paid, "red_ml":red_ml, "green_ml":green_ml, "blue_ml":blue_ml, "dark_ml":dark_ml}])
+            "INSERT INTO gold_ledger (gold) VALUES (-:gold)"),
+            [{"gold":gold_paid}])
+        
+        connection.execute(sqlalchemy.text(
+            "INSERT INTO ml_ledger (red, green, blue, dark) VALUES (:red, :green, :blue, :dark)"),
+            [{"red":ml[0], "green":ml[1], "blue":ml[2], "dark":ml[3]}])
 
-    print(f"gold_paid: {gold_paid} red_ml: {red_ml} green_ml: {green_ml} blue_ml: {blue_ml} dark_ml: {dark_ml}")
-
+    print(f"gold paid: {gold_paid}, ml: {ml})")
     return "OK"
 
 # Gets called once a day
 @router.post("/plan")
 def get_wholesale_purchase_plan(wholesale_catalog: list[Barrel]):
-    """ """
-    print(f"barrel_catalog {wholesale_catalog}")
+    """
+    Wholesale purchase plan iterates over the ml types and the wholesale catalog
+    determining which barrels to buy by the criteria of bigger then more is better.
+    """
+    print(f"barrel catalog: {wholesale_catalog}")
 
     with db.engine.begin() as connection:
-        results = connection.execute(sqlalchemy.text(
-            "SELECT gold, red_ml, green_ml, blue_ml FROM global_inventory")).one()
+        ml_inventory = connection.execute(sqlalchemy.text(
+            "SELECT SUM(red), SUM(green), SUM(blue), SUM(dark) FROM ml_ledger")).one()
         
-        gold = results.gold
-        ml_inventory = [results.red_ml, results.green_ml, results.blue_ml]
+        gold = connection.execute(sqlalchemy.text(
+            "SELECT SUM(gold) FROM gold_ledger")).scalar_one()
+        
+        ml_total_capacity = connection.execute(sqlalchemy.text(
+            "SELECT SUM(ml) FROM capacity_ledger")).scalar_one()
+        
         current_ml = sum(ml_inventory)
+        ml_capacity = ml_total_capacity - current_ml
 
-        # STRATEGY - for each ml buy barrels that brings ml closest to the target ml
-        TARGET_ML = 1000
+        # STRATEGY
+        # - for each ml buy barrels that brings ml closest to the target ml which is 90% capacity
+        TARGET_ML = ml_capacity * 0.9
+        # - if gold and capacity is a multiple above all large barrels start buying that multiple
+        PRICE_LARGE = 2250
+        ML_LARGE = 40000
+        quantity = min([(gold // (PRICE_LARGE * 2)) + 1, (ml_capacity // (ML_LARGE * 2)) + 1])
 
         barrel_purchases = []
 
@@ -92,19 +95,21 @@ def get_wholesale_purchase_plan(wholesale_catalog: list[Barrel]):
             ml_add = 0
 
             for barrel in wholesale_catalog:
-                if len(barrel.potion_type) < 3:
-                    break
-
-                if (barrel.potion_type[i] > 0) & (barrel.price <= gold) & (barrel.ml_per_barrel > ml_add) & (ml + barrel.ml_per_barrel <= TARGET_ML):
-                    barrel_purchase = {"sku":barrel.sku, "quantity":1}
-                    price = barrel.price
-                    ml_add = barrel.ml_per_barrel
+                if (barrel.ml_per_barrel * quantity <= ml_capacity and # have the capacity
+                    barrel.potion_type[i] > 0 and # right type
+                    barrel.quantity >= quantity and # has the desired quantity 
+                    barrel.price * quantity <= gold and # affordable
+                    barrel.ml_per_barrel * quantity > ml_add and # highest ml content
+                    ml + barrel.ml_per_barrel * quantity <= TARGET_ML): # closest to target
+            
+                    barrel_purchase = {"sku":barrel.sku, "quantity":quantity}
+                    price = barrel.price * quantity
+                    ml_add = barrel.ml_per_barrel * quantity
 
             if barrel_purchase is not None:
                 barrel_purchases.append(barrel_purchase)
                 gold -= price
-                current_ml += ml_add
+                ml_capacity -= ml_add
 
-    print(f"barrel_purchases: {barrel_purchases}")
-
+    print(f"barrel plan: {barrel_purchases}")
     return barrel_purchases

@@ -3,6 +3,7 @@ from enum import Enum
 from pydantic import BaseModel
 from src.api import auth
 import sqlalchemy
+from sqlite3 import IntegrityError
 from src import database as db
 
 router = APIRouter(
@@ -17,30 +18,38 @@ class PotionInventory(BaseModel):
 
 @router.post("/deliver/{order_id}")
 def post_deliver_bottles(potions_delivered: list[PotionInventory], order_id: int):
-    """ """
-    print(f"potions delivered: {potions_delivered} order_id: {order_id}")
+    """
+    Deliver bottles takes potions iterates over them and the catalog to subtract from ml
+    and add potions.
+    """
+    print(f"potions delivered: {potions_delivered}, order id: {order_id}")
 
     with db.engine.begin() as connection:
+        try:
+            connection.execute(sqlalchemy.text(
+                "INSERT INTO processed (job_id, type) VALUES (:order_id, 'potions')"), 
+                [{"order_id":order_id}])
+        except IntegrityError as e:
+            return "OK"
+        
         catalog = connection.execute(sqlalchemy.text(
-            "SELECT quantity, sku, type FROM catalog"))
-
-        red_ml, green_ml, blue_ml = connection.execute(sqlalchemy.text(
-            "SELECT red_ml, green_ml, blue_ml FROM global_inventory")).one()
+            "SELECT sku, type FROM catalog"))
 
         for potion in catalog:
             for delivery in potions_delivered:
                 if delivery.potion_type == potion.type:
-                    red_ml -= potion.type[0] * delivery.quantity
-                    green_ml -= potion.type[1] * delivery.quantity
-                    blue_ml -= potion.type[2] * delivery.quantity
-
+                    ml = []
+                    
+                    for i in range(4):
+                        ml.append(potion.type[i] * delivery.quantity)
+                    
                     connection.execute(sqlalchemy.text(
-                        "UPDATE global_inventory SET red_ml = :red_ml, green_ml = :green_ml, blue_ml = :blue_ml"),
-                        [{"red_ml":red_ml, "green_ml":green_ml, "blue_ml":blue_ml}])
-
+                        "INSERT INTO ml_ledger (red, green, blue, dark) VALUES (-:red, -:green, -:blue, -:dark)"),
+                        [{"red":ml[0], "green":ml[1], "blue":ml[2], "dark":ml[3]}])
+                    
                     connection.execute(sqlalchemy.text(
-                        "UPDATE catalog SET quantity = :quantity WHERE sku = :sku"),
-                        [{"quantity":str(potion.quantity + delivery.quantity), "sku":potion.sku}])
+                        "INSERT INTO potion_ledger (sku, quantity) VALUES (:sku, :quantity)"),
+                        [{"sku":potion.sku, "quantity":delivery.quantity}])
     
     return "OK"
 
@@ -51,49 +60,54 @@ def get_bottle_plan():
     """
 
     with db.engine.begin() as connection:
-        red_ml, green_ml, blue_ml = connection.execute(sqlalchemy.text(
-            "SELECT red_ml, green_ml, blue_ml FROM global_inventory")).one()
+        catalog = connection.execute(sqlalchemy.text(
+            "SELECT sku, type FROM catalog ORDER BY priority"))
+        
+        ml_inventory = connection.execute(sqlalchemy.text(
+            "SELECT SUM(red), SUM(green), SUM(blue), SUM(dark) FROM ml_ledger")).one()
+        
+        total_potions = connection.execute(sqlalchemy.text(
+            "SELECT SUM(quantity) FROM potion_ledger")).scalar_one()
+        
+        total_capacity = connection.execute(sqlalchemy.text(
+            "SELECT SUM(potions) FROM capacity_ledger")).scalar_one()
+        
+        potion_capacity = total_capacity - total_potions
 
+        ml_list = []
+        for i, ml in enumerate(ml_inventory):
+            ml_list.append(ml)
+
+        # build order by potion priority
         order = []
+        for potion in catalog:
+            # find the quantity that can be made
+            required = []
+            for i in range(4):
+                if potion.type[i] > 0:
+                    required.append(ml_list[i] // potion.type[i])
+            quantity = min(required)
 
-        # MAGIC BOTTLES
-        quantity = min([(red_ml // 30), (green_ml // 30), (blue_ml // 30)])
-        red_ml -= quantity * 30
-        green_ml -= quantity * 30
-        blue_ml -= quantity * 30
-        if quantity > 0:
-            order.append(
-                {
-                    "potion_type": [30, 30, 30, 0],
-                    "quantity": quantity,
-                }
-            )
-        
-        # HEALTH BOTTLES
-        quantity = red_ml // 100
-        red_ml -= quantity * 100
-        if quantity > 0:
-            order.append(
-                {
-                    "potion_type": [100, 0, 0, 0],
-                    "quantity": quantity,
-                }
-            )
+            # capacity limit
+            if quantity > potion_capacity:
+                quantity = potion_capacity
 
-        # STAMINA BOTTLES
-        quantity = green_ml // 100
-        green_ml -= quantity * 100
-        if quantity > 0:
-            order.append(
-                {
-                    "potion_type": [0, 100, 0, 0],
-                    "quantity": quantity,
-                }
-            )
-        
-        
-    print("get_bottle_plan:", order)
+            # subtract ml available for other potions
+            for i in range(4):
+                ml_list[i] -= quantity * potion.type[i]
 
+            total_potions += quantity
+            potion_capacity -= quantity
+
+            if quantity > 0:
+                order.append(
+                    {
+                        "potion_type": potion.type,
+                        "quantity": quantity,
+                    }
+                )
+        
+    print(f"bottle plan: {order}")
     return order
 
 if __name__ == "__main__":
