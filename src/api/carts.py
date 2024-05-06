@@ -58,6 +58,12 @@ def search_orders(
     if search_page == "":
         search_page = 0
 
+    if sort_col.split(":")[0] == "search_sort_options":
+        sort_col = sort_col.split(":")[1]
+
+    if sort_order.split(":")[0] == "search_sort_order":
+        sort_order = sort_order.split(":")[1]
+
     with db.engine.connect() as connection:
         result = connection.execute(sqlalchemy.text(
             f"""
