@@ -1,3 +1,4 @@
+from sqlite3 import IntegrityError
 from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
 from src.api import auth
@@ -54,19 +55,48 @@ def search_orders(
     time is 5 total line items.
     """
 
-    return {
-        "previous": "",
-        "next": "",
-        "results": [
-            {
-                "line_item_id": 1,
-                "item_sku": "1 oblivion potion",
-                "customer_name": "Scaramouche",
-                "line_item_total": 50,
-                "timestamp": "2021-01-01T00:00:00Z",
-            }
-        ],
-    }
+    if search_page == "":
+        search_page = 0
+
+    with db.engine.connect() as connection:
+        result = connection.execute(sqlalchemy.text(
+            f"""
+                SELECT timestamp, line_item_total, potion_sku, item_sku, customer_name, id FROM orders
+                WHERE 1=1
+                {("" if customer_name == "" else "AND customer_name ILIKE '%" + customer_name + "%'")}
+                {("" if potion_sku == "" else "AND potion_sku ILIKE '%" + potion_sku + "%'")}
+                ORDER BY {sort_col} {sort_order}
+                LIMIT 6
+                OFFSET :page
+            """),
+            [{"page":search_page}])
+
+        next = ""
+        results = []
+
+        for i, row in enumerate(result):
+            if i == 5:
+                next = int(search_page) + 5
+                break
+
+            results.append(
+                {
+                    "line_item_id": row.id,
+                    "item_sku": row.item_sku,
+                    "customer_name": row.customer_name,
+                    "line_item_total": row.line_item_total,
+                    "timestamp": row.timestamp,
+                }
+            )
+        
+    json = [
+        {
+            "previous": ("" if int(search_page) - 5 < 0 else int(search_page) - 5),
+            "next": next,
+            "results": results
+        }]
+
+    return json
 
 
 class Customer(BaseModel):
@@ -79,7 +109,14 @@ def post_visits(visit_id: int, customers: list[Customer]):
     """
     Which customers visited the shop today?
     """
-    print(customers)
+    for customer in customers:
+        with db.engine.begin() as connection:
+            try:
+                connection.execute(sqlalchemy.text(
+                    "INSERT INTO visits (customer_name, character_class, level) VALUES (:customer_name, :character_class, :level)"), 
+                    [{"customer_name":customer.customer_name, "character_class":customer.character_class, "level":customer.level}])
+            except IntegrityError as e:
+                return "OK"
 
     return "OK"
 
@@ -145,20 +182,28 @@ def checkout(cart_id: int, cart_checkout: CartCheckout):
             "SELECT sku, quantity FROM cart_items WHERE cart = (:cart_id)"),
             [{"cart_id":cart_id}])
         
+        customer = connection.execute(sqlalchemy.text(
+            "SELECT customer_name FROM cart WHERE id = (:cart_id)"),
+            [{"cart_id":cart_id}]).scalar_one()
+        
         catalog = list(connection.execute(sqlalchemy.text(
-            "SELECT sku, price FROM catalog")))
+            "SELECT sku, name, price FROM catalog")))
 
         payment = 0
         total = 0
 
         for item in cart_items:
-            for sku, price in catalog:
+            for sku, name, price in catalog:
                 if item.sku == sku:
                     payment += price * item.quantity
                     total += item.quantity
                     connection.execute(sqlalchemy.text(
                         "INSERT INTO potion_ledger (sku, quantity) VALUES (:sku, -:quantity)"),
                         [{"sku":sku, "quantity":item.quantity}])
+                    
+                    connection.execute(sqlalchemy.text(
+                        "INSERT INTO orders (line_item_total, potion_sku, item_sku, customer_name) VALUES (:quantity, :sku, :item_sku, :customer)"),
+                        [{"quantity":item.quantity, "sku":sku, "item_sku":f"{item.quantity} {name}", "customer":customer}])
                     
         connection.execute(sqlalchemy.text(
             "INSERT INTO gold_ledger (gold) VALUES (:gold)"),

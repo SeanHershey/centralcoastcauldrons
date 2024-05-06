@@ -31,8 +31,8 @@ def post_deliver_barrels(barrels_delivered: list[Barrel], order_id: int):
     with db.engine.begin() as connection:
         try:
             connection.execute(sqlalchemy.text(
-                "INSERT INTO processed (job_id, type) VALUES (:order_id, 'barrels')"), 
-                [{"order_id":order_id}])
+                "INSERT INTO processed (job_id, type, description) VALUES (:order_id, 'barrels', :description)"), 
+                [{"order_id":order_id, "description":f"{barrels_delivered}"}])
         except IntegrityError as e:
             return "OK"
         
