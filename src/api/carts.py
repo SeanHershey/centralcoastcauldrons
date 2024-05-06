@@ -58,11 +58,19 @@ def search_orders(
     if search_page == "":
         search_page = 0
 
-    if sort_col.split(".")[0] == "search_sort_options":
-        sort_col = sort_col.split(".")[1]
+    if sort_col == search_sort_options.timestamp:
+        sort_col = "timestamp"
+    elif sort_col == search_sort_options.customer_name:
+        sort_col = "customer_name"
+    elif sort_col == search_sort_options.item_sku:
+        sort_col = "item_sku"
+    elif sort_col == search_sort_options.line_item_total:
+        sort_col = "line_item_total"
 
-    if sort_order.split(".")[0] == "search_sort_order":
-        sort_order = sort_order.split(".")[1]
+    if sort_order == search_sort_order.asc:
+        sort_order = "asc"
+    elif sort_order == search_sort_order.desc:
+        sort_order = "desc"
 
     with db.engine.connect() as connection:
         result = connection.execute(sqlalchemy.text(
