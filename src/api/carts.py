@@ -102,15 +102,12 @@ def search_orders(
                     "timestamp": row.timestamp,
                 }
             )
-        
-    json = [
-        {
+
+    return {
             "previous": ("" if int(search_page) - 5 < 0 else int(search_page) - 5),
             "next": next,
             "results": results
-        }]
-
-    return json
+        }
 
 
 class Customer(BaseModel):
