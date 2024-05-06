@@ -56,7 +56,7 @@ def search_orders(
     """
 
     if search_page == "":
-        search_page = 0
+        search_page = "0"
 
     if sort_col == search_sort_options.timestamp:
         sort_col = "timestamp"
