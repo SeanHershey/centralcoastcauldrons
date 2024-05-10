@@ -215,8 +215,8 @@ def checkout(cart_id: int, cart_checkout: CartCheckout):
                         [{"sku":sku, "quantity":item.quantity}])
                     
                     connection.execute(sqlalchemy.text(
-                        "INSERT INTO orders (line_item_total, potion_sku, item_sku, customer_name) VALUES (:quantity, :sku, :item_sku, :customer)"),
-                        [{"quantity":item.quantity, "sku":sku, "item_sku":f"{item.quantity} {name}", "customer":customer}])
+                        "INSERT INTO orders (line_item_total, potion_sku, item_sku, customer_name) VALUES (:payment, :sku, :item_sku, :customer)"),
+                        [{"payment":payment, "sku":sku, "item_sku":f"{item.quantity} {name}", "customer":customer}])
                     
         connection.execute(sqlalchemy.text(
             "INSERT INTO gold_ledger (gold) VALUES (:gold)"),
