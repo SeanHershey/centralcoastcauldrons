@@ -13,7 +13,7 @@ def get_catalog():
         
     with db.engine.begin() as connection:
         results = connection.execute(sqlalchemy.text(
-            "SELECT sku, name, price, type FROM catalog")) # TODO: JOIN POTIONS ON LEDGER
+            "SELECT sku, name, price, type FROM catalog")) # TODO: JOIN POTIONS ON LEDGER GROUP BY 
 
         catalog = []
 

@@ -76,6 +76,12 @@ def get_wholesale_purchase_plan(wholesale_catalog: list[Barrel]):
         ml_total_capacity = connection.execute(sqlalchemy.text(
             "SELECT SUM(ml) FROM capacity_ledger")).scalar_one()
         
+        total_potions = connection.execute(sqlalchemy.text(
+            "SELECT SUM(quantity) FROM potion_ledger")).scalar_one()
+        
+        total_capacity = connection.execute(sqlalchemy.text(
+            "SELECT SUM(potions) FROM capacity_ledger")).scalar_one()
+        
         current_ml = sum(ml_inventory)
         ml_capacity = ml_total_capacity - current_ml
 
@@ -95,7 +101,8 @@ def get_wholesale_purchase_plan(wholesale_catalog: list[Barrel]):
             ml_add = 0
 
             for barrel in wholesale_catalog:
-                if (barrel.ml_per_barrel * quantity <= ml_capacity and # have the capacity
+                if (total_potions / total_capacity < 0.85 and # not prioritizing gold for potion capacity
+                    barrel.ml_per_barrel * quantity <= ml_capacity and # have the capacity
                     barrel.potion_type[i] > 0 and # right type
                     barrel.quantity >= quantity and # has the desired quantity 
                     barrel.price * quantity <= gold and # affordable

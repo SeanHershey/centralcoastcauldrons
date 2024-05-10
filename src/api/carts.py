@@ -77,23 +77,23 @@ def search_orders(
             f"""
                 SELECT timestamp, line_item_total, potion_sku, item_sku, customer_name, id FROM orders
                 WHERE 1=1
-                {("" if customer_name == "" else "AND customer_name ILIKE '%" + customer_name + "%'")}
-                {("" if potion_sku == "" else "AND potion_sku ILIKE '%" + potion_sku + "%'")}
+                {("" if customer_name == "" else "AND customer_name ILIKE :customer_name")}
+                {("" if potion_sku == "" else "AND potion_sku ILIKE :potion_sku")}
                 ORDER BY {sort_col} {sort_order}
                 LIMIT 6
                 OFFSET :page
             """),
-            [{"page":search_page}])
+            [{"page":int(search_page), "customer_name":"%"+customer_name+"%", "potion_sku":"%"+potion_sku+"%"}])
 
         next = ""
-        results = []
+        search_results = []
 
-        for i, row in enumerate(result):
+        for i, row in enumerate(search_results):
             if i == 5:
                 next = int(search_page) + 5
                 break
 
-            results.append(
+            search_results.append(
                 {
                     "line_item_id": row.id,
                     "item_sku": row.item_sku,
@@ -106,7 +106,7 @@ def search_orders(
     return {
             "previous": ("" if int(search_page) - 5 < 0 else str(int(search_page) - 5)),
             "next": str(next),
-            "results": results
+            "results": search_results
         }
 
 
@@ -161,7 +161,7 @@ def set_item_quantity(cart_id: int, item_sku: str, cart_item: CartItem):
             "SELECT sku, quantity FROM cart_items WHERE cart = (:cart_id)"),
             [{"cart_id":cart_id}])
 
-        # update
+        # TODO: build list
         updates = 0
         for item in cart_items:
             if item.sku == item_sku:
@@ -170,7 +170,6 @@ def set_item_quantity(cart_id: int, item_sku: str, cart_item: CartItem):
                     "UPDATE cart_items SET quantity = (:quantity) WHERE sku = (:item_sku) and cart = (:cart_id)"),
                     [{"quantity":str(cart_item.quantity), "item_sku":item_sku, "cart_id":cart_id}])
 
-        # insert
         if updates == 0:
             connection.execute(sqlalchemy.text(
                 "INSERT INTO cart_items (cart, sku, quantity) VALUES (:cart_id, :item_sku, :quantity)"),
@@ -189,6 +188,7 @@ def checkout(cart_id: int, cart_checkout: CartCheckout):
     """
 
     with db.engine.begin() as connection:
+        # TODO: join these
         cart_items = connection.execute(sqlalchemy.text(
             "SELECT sku, quantity FROM cart_items WHERE cart = (:cart_id)"),
             [{"cart_id":cart_id}])
@@ -208,6 +208,8 @@ def checkout(cart_id: int, cart_checkout: CartCheckout):
                 if item.sku == sku:
                     payment += price * item.quantity
                     total += item.quantity
+                    
+                    # TODO: build list and append
                     connection.execute(sqlalchemy.text(
                         "INSERT INTO potion_ledger (sku, quantity) VALUES (:sku, -:quantity)"),
                         [{"sku":sku, "quantity":item.quantity}])

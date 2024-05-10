@@ -42,12 +42,16 @@ def get_capacity_plan():
         gold = connection.execute(sqlalchemy.text(
             "SELECT SUM(gold) FROM gold_ledger")).scalar_one()
         
-        units = gold // 3000
+        total_capacity = connection.execute(sqlalchemy.text(
+            "SELECT SUM(potions) FROM capacity_ledger")).scalar_one()
+        
+        # buy just potion capacity first then buy together
+        units = gold // 1000 if total_capacity == 50 else gold // 3000
 
     print(f"capacity plan potion units: {units}, ml units: {units}")
     return {
         "potion_capacity": units,
-        "ml_capacity": units
+        "ml_capacity": 0 if total_capacity == 50 else units
     }
 
 class CapacityPurchase(BaseModel):
