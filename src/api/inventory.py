@@ -47,11 +47,14 @@ def get_capacity_plan():
         
         # buy just potion capacity first then buy together
         units = gold // 1000 if total_capacity == 50 else gold // 3000
+        
+        # late game addition
+        units = units // 2
 
-    print(f"capacity plan potion units: {units}, ml units: {units}")
+    print(f"capacity plan potion units: {units}, ml units: {0}")
     return {
         "potion_capacity": units,
-        "ml_capacity": 0 if total_capacity == 50 else units
+        "ml_capacity": 0 #if total_capacity == 50 else units
     }
 
 class CapacityPurchase(BaseModel):

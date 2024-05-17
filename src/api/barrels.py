@@ -101,7 +101,7 @@ def get_wholesale_purchase_plan(wholesale_catalog: list[Barrel]):
             ml_add = 0
 
             for barrel in wholesale_catalog:
-                if (total_potions / total_capacity < 0.85 and # not prioritizing gold for potion capacity
+                if ((total_potions / total_capacity < 0.8 or current_ml / ml_total_capacity < 0.5) and # not prioritizing gold for capacity
                     barrel.ml_per_barrel * quantity <= ml_capacity and # have the capacity
                     barrel.potion_type[i] > 0 and # right type
                     barrel.quantity >= quantity and # has the desired quantity 
