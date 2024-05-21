@@ -96,6 +96,9 @@ def get_wholesale_purchase_plan(wholesale_catalog: list[Barrel]):
         barrel_purchases = []
 
         for i, ml in enumerate(ml_inventory):
+            #late game stop buying
+            break
+
             barrel_purchase = None
             price = None
             ml_add = 0
