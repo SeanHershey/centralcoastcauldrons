@@ -53,7 +53,7 @@ def get_capacity_plan():
 
     print(f"capacity plan potion units: {units}, ml units: {0}")
     return {
-        "potion_capacity": units,
+        "potion_capacity": 0, #units,
         "ml_capacity": 0 #if total_capacity == 50 else units
     }
 
